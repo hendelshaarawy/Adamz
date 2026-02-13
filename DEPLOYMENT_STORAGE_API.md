@@ -248,6 +248,10 @@ This project now includes a root `Dockerfile` and `.dockerignore`.
 Try again with one of these approaches:
 
 1. **Docker deploy mode** (Render/Railway/etc.): redeploy from repo root.
+   - Render settings must point to repo root:
+     - **Root Directory**: leave empty (or `.`)
+     - **Dockerfile Path**: `./Dockerfile`
+   - If your service points to a subfolder, Render will not find the root Dockerfile.
 2. **Native Node deploy mode**: set build `npm install` and start `node server.js` / `npm start`.
 
 Local Docker test:
@@ -262,6 +266,19 @@ Then verify:
 ```bash
 curl http://localhost:8080/healthz
 ```
+
+
+### If error still persists on Render
+
+1. Confirm `Dockerfile` exists at repository root (same level as `package.json`).
+2. In Render service settings:
+   - switch Runtime to Docker
+   - set Root Directory to empty/`.`
+   - set Dockerfile Path to `./Dockerfile`
+3. Trigger **Manual Deploy** → **Clear build cache & deploy**.
+4. If using monorepo, either:
+   - move/copy Dockerfile into the configured subdirectory, or
+   - change Root Directory back to repo root.
 
 ---
 

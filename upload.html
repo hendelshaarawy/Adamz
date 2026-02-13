@@ -19,6 +19,7 @@
           <a href="index.html" class="nav-link">Home</a>
           <a href="#payment" class="nav-link">Payment</a>
           <a href="#insights" class="nav-link">Insights</a>
+          <a href="history.html" class="nav-link">History</a>
         </div>
       </nav>
     </header>
@@ -63,28 +64,17 @@
           <span id="uploadStatus" class="small"></span>
           <span id="uploadQuota" class="small quota-pill">Remaining paid uploads: 0</span>
         </div>
-      </section>
-
-      <section class="panel" id="transactions">
-        <h2 style="margin-top:0;">Payment & File History</h2>
-        <p class="small">Each paid transaction is logged with timestamps and cloud links for original/cleaned files and dashboard PDF.</p>
-        <div class="field" style="margin-bottom:0.75rem;">
+        <div class="field" style="margin-top:1rem;">
           <label for="storageApiInput">Storage API URL (where <code>server.js</code> runs)</label>
           <input id="storageApiInput" placeholder="https://your-storage-api.example.com" />
         </div>
-        <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+        <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.75rem;">
           <button id="saveStorageApiBtn" class="btn btn-sm" type="button">Save Storage API URL</button>
           <button id="clearStorageApiBtn" class="btn btn-sm" type="button">Clear</button>
           <span id="storageApiStatus" class="small"></span>
         </div>
-        <table id="transactionTable">
-          <thead>
-            <tr><th>Transaction</th><th>Paid at</th><th>Uploaded at</th><th>File</th><th>Actions</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <p class="small" style="margin-top:0.5rem;">Payment & file history moved to <a href="history.html">History page</a>.</p>
       </section>
-
 
       <section class="panel hidden" id="insights">
         <h2 style="margin-top:0;">Insights Dashboard</h2>

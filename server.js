@@ -10,6 +10,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET;
 const SUPABASE_SIGNED_URL_TTL_SECONDS = Number(process.env.SUPABASE_SIGNED_URL_TTL_SECONDS || 7200);
+const HISTORY_USERNAME = process.env.HISTORY_USERNAME || '';
+const HISTORY_PASSWORD = process.env.HISTORY_PASSWORD || '';
 
 if (!SUPABASE_URL) {
   throw new Error('Missing required environment variable: SUPABASE_URL');
@@ -47,6 +49,36 @@ const supabase = createClient(supabaseBaseUrl, SUPABASE_SERVICE_ROLE_KEY, {
 
 app.get('/healthz', (req, res) => {
   res.status(200).json({ ok: true, service: 'adamz-storage-api' });
+});
+
+
+app.get('/history/auth-check', (req, res) => {
+  if (!HISTORY_USERNAME || !HISTORY_PASSWORD) {
+    return res.status(503).json({ error: 'History credentials are not configured.' });
+  }
+
+  const authHeader = String(req.headers.authorization || '');
+  if (!authHeader.startsWith('Basic ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.slice('Basic '.length).trim();
+  let decoded = '';
+  try {
+    decoded = Buffer.from(token, 'base64').toString('utf8');
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const separatorIndex = decoded.indexOf(':');
+  const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : '';
+  const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : '';
+
+  if (username !== HISTORY_USERNAME || password !== HISTORY_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  return res.status(200).json({ ok: true });
 });
 
 app.post('/storage/create-upload', async (req, res) => {

@@ -65,6 +65,7 @@ Optional:
 - `PORT` (default `8080`)
 - `ALLOWED_ORIGINS` (comma-separated, use `*` only for quick testing)
 - `SUPABASE_SIGNED_URL_TTL_SECONDS` (response metadata; default `7200`)
+- `HISTORY_USERNAME` / `HISTORY_PASSWORD` (optional, required to unlock `history.html`)
 
 ### Beginner quick path (recommended)
 
@@ -79,6 +80,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_BUCKET=adamz-artifacts
 ALLOWED_ORIGINS=http://localhost:4173
 SUPABASE_SIGNED_URL_TTL_SECONDS=7200
+HISTORY_USERNAME=admin
+HISTORY_PASSWORD=ChangeMe123!
 ENVVARS
 ```
 
@@ -105,6 +108,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_BUCKET=adamz-artifacts
 ALLOWED_ORIGINS=http://localhost:4173
 SUPABASE_SIGNED_URL_TTL_SECONDS=7200
+HISTORY_USERNAME=admin
+HISTORY_PASSWORD=ChangeMe123!
 "@ | Set-Content -Path .env
 
 Get-Content .env | ForEach-Object {
@@ -135,6 +140,8 @@ SUPABASE_URL=https://your-project-id.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
 SUPABASE_BUCKET=adamz-artifacts \
 ALLOWED_ORIGINS=http://localhost:4173 \
+HISTORY_USERNAME=admin \
+HISTORY_PASSWORD=ChangeMe123! \
 node server.js
 ```
 
@@ -173,6 +180,8 @@ SUPABASE_URL=https://your-project-id.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
 SUPABASE_BUCKET=adamz-artifacts \
 ALLOWED_ORIGINS=http://localhost:4173 \
+HISTORY_USERNAME=admin \
+HISTORY_PASSWORD=ChangeMe123! \
 node server.js
 ```
 
@@ -226,6 +235,8 @@ The frontend flow already implemented in `upload.js`:
 3. Uploads bytes using `PUT uploadUrl`.
 4. Saves `publicUrl` in transaction artifacts for later download.
 
+Payment & File History now lives on `history.html`. Use credentials configured via `HISTORY_USERNAME` and `HISTORY_PASSWORD` at the Storage API.
+
 ## 8) Deploy backend
 
 Deploy this Node API to Render/Railway/Fly.io/VPS/Cloud Run and set environment variables from step 4.
@@ -238,6 +249,13 @@ in your frontend production page.
 
 ---
 
+
+## Notes: PDF export behavior
+
+- The generated dashboard PDF excludes the **Download cleaned file** card by design.
+- Chart animations are disabled and chart paint is awaited before PDF capture, so uploaded dashboard PDFs include chart data visible on screen.
+
+---
 
 ## Troubleshooting: `failed to read dockerfile: open Dockerfile: no such file or directory`
 

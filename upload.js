@@ -9,7 +9,6 @@ const finalConclusion = document.getElementById('finalConclusion');
 const downloadCsvBtn = document.getElementById('downloadCsvBtn');
 const downloadExcelBtn = document.getElementById('downloadExcelBtn');
 const downloadDashboardBtn = document.getElementById('downloadDashboardBtn');
-const transactionTableBody = document.querySelector('#transactionTable tbody');
 const storageApiInput = document.getElementById('storageApiInput');
 const saveStorageApiBtn = document.getElementById('saveStorageApiBtn');
 const clearStorageApiBtn = document.getElementById('clearStorageApiBtn');
@@ -35,7 +34,6 @@ cardExpInput.addEventListener('input', () => {
 
 updateQuotaLabel();
 initializeStorageApiControls();
-renderTransactionTable();
 initializeDemoDashboardIfRequested();
 
 
@@ -88,7 +86,6 @@ function renderStorageApiStatus() {
     storageApiStatus.className = 'small status-warn';
   }
 
-  renderTransactionTable();
 }
 
 fileInput.addEventListener('change', () => {
@@ -136,8 +133,7 @@ paymentForm.addEventListener('submit', (event) => {
   });
 
   persistTransactions();
-  renderTransactionTable();
-
+  
   paymentStatus.textContent = 'Payment successful ($5). You can analyze 1 file before paying again.';
   paymentStatus.className = 'small status-ok';
   updateQuotaLabel();
@@ -175,8 +171,7 @@ analyzeBtn.addEventListener('click', async () => {
 
       if (STORAGE_API_BASE) {
         tx.storageStatus = 'uploading';
-        renderTransactionTable();
-
+        
         tx.artifacts = await uploadArtifactsToStorage({
           transactionId: tx.id,
           originalFile: file,
@@ -192,8 +187,7 @@ analyzeBtn.addEventListener('click', async () => {
       }
 
       persistTransactions();
-      renderTransactionTable();
-    }
+          }
 
     remainingAnalyses = 0;
     isPaid = false;
@@ -214,8 +208,7 @@ analyzeBtn.addEventListener('click', async () => {
     if (tx && tx.status === 'paid') {
       tx.status = 'failed';
       persistTransactions();
-      renderTransactionTable();
-    }
+          }
   }
 });
 
@@ -235,31 +228,6 @@ downloadDashboardBtn.addEventListener('click', async () => {
   downloadBlob(pdfBlob, `${lastUploadedName}_dashboard.pdf`);
 });
 
-transactionTableBody.addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-
-  const tx = findTransaction(button.dataset.id);
-  if (!tx) return;
-
-  const actions = {
-    original: tx.artifacts?.originalUrl,
-    csv: tx.artifacts?.cleanedCsvUrl,
-    xlsx: tx.artifacts?.cleanedExcelUrl,
-    pdf: tx.artifacts?.dashboardPdfUrl
-  };
-
-  const url = actions[button.dataset.action];
-  if (!url) return;
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-});
 
 async function uploadArtifactsToStorage({ transactionId, originalFile, cleanedCsvBlob, cleanedExcelBlob, dashboardPdfBlob, baseName }) {
   const originalUrl = await uploadArtifactToStorage(transactionId, originalFile, `${baseName}_original${extractExt(originalFile.name)}`);
@@ -375,38 +343,6 @@ function findTransaction(id) {
   return transactions.find((tx) => tx.id === id);
 }
 
-function renderTransactionTable() {
-  if (!transactions.length) {
-    transactionTableBody.innerHTML = '<tr><td colspan="5">No transactions yet.</td></tr>';
-    return;
-  }
-
-  transactionTableBody.innerHTML = transactions.map((tx) => {
-    const uploadedLabel = tx.uploadedAt ? formatDateTime(tx.uploadedAt) : 'Pending upload';
-    const artifact = tx.artifacts || {};
-    const statusLabel = tx.storageStatus === 'stored'
-      ? 'Stored in cloud'
-      : tx.storageStatus === 'uploading'
-        ? 'Uploading…'
-        : tx.storageStatus === 'storage_not_configured'
-          ? 'Storage API not configured'
-          : tx.storageStatus || '—';
-
-    return `<tr>
-      <td>${tx.id}<br><span class="small">${statusLabel}</span></td>
-      <td>${formatDateTime(tx.paidAt)}</td>
-      <td>${uploadedLabel}</td>
-      <td>${tx.fileName || '—'}</td>
-      <td class="history-actions">
-        <button class="btn btn-sm" data-action="original" data-id="${tx.id}" ${artifact.originalUrl ? '' : 'disabled'}>Original</button>
-        <button class="btn btn-sm" data-action="csv" data-id="${tx.id}" ${artifact.cleanedCsvUrl ? '' : 'disabled'}>Clean CSV</button>
-        <button class="btn btn-sm" data-action="xlsx" data-id="${tx.id}" ${artifact.cleanedExcelUrl ? '' : 'disabled'}>Clean Excel</button>
-        <button class="btn btn-sm" data-action="pdf" data-id="${tx.id}" ${artifact.dashboardPdfUrl ? '' : 'disabled'}>Dashboard PDF</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
 function formatDateTime(iso) {
   return iso ? new Date(iso).toLocaleString() : '—';
 }
@@ -445,28 +381,54 @@ function buildCleanedExcelBlob(rows) {
 }
 
 async function buildDashboardPdfBlob() {
-  const canvas = await html2canvas(insightsSection, { backgroundColor: '#ffffff', scale: 2 });
-  const imageData = canvas.toDataURL('image/png');
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth - 10;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  await waitForChartPaint();
 
-  let heightLeft = imgHeight;
-  let position = 5;
-  pdf.addImage(imageData, 'PNG', 5, position, imgWidth, imgHeight);
-  heightLeft -= (pageHeight - 10);
+  const exportSection = insightsSection.cloneNode(true);
+  exportSection.classList.remove('hidden');
+  exportSection.querySelectorAll('.download-card').forEach((el) => el.remove());
+  exportSection.style.width = `${insightsSection.scrollWidth}px`;
+  exportSection.style.background = '#ffffff';
+  exportSection.style.padding = '8px';
 
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight + 5;
-    pdf.addPage();
+  const sandbox = document.createElement('div');
+  sandbox.style.position = 'fixed';
+  sandbox.style.left = '-100000px';
+  sandbox.style.top = '0';
+  sandbox.style.zIndex = '-1';
+  sandbox.appendChild(exportSection);
+  document.body.appendChild(sandbox);
+
+  try {
+    const canvas = await html2canvas(exportSection, { backgroundColor: '#ffffff', scale: 2 });
+    const imageData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth - 10;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 5;
     pdf.addImage(imageData, 'PNG', 5, position, imgWidth, imgHeight);
     heightLeft -= (pageHeight - 10);
-  }
 
-  return pdf.output('blob');
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight + 5;
+      pdf.addPage();
+      pdf.addImage(imageData, 'PNG', 5, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - 10);
+    }
+
+    return pdf.output('blob');
+  } finally {
+    sandbox.remove();
+  }
+}
+
+async function waitForChartPaint() {
+  chartRefs.forEach((chart) => chart.update('none'));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
 function parseFile(file) {
@@ -710,6 +672,7 @@ function baseChartOptions(kind = 'default') {
   const base = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     scales: {
       x: { ticks: { color: '#334155' }, grid: { color: 'rgba(148, 163, 184, 0.25)' } },
       y: { ticks: { color: '#334155' }, grid: { color: 'rgba(148, 163, 184, 0.25)' } }

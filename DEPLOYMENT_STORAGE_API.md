@@ -226,7 +226,7 @@ In `upload.html` you can set:
 </script>
 ```
 
-Or, in the Upload page UI, paste your Storage API URL in **Storage API URL** and click **Save Storage API URL** (it is stored in browser localStorage).
+Or, in `history.html`, paste your Storage API URL and click **Save Storage API URL** (stored in browser localStorage).
 
 The frontend flow already implemented in `upload.js`:
 
@@ -306,7 +306,7 @@ If the Upload page shows `Failed to fetch`, the browser could not reach the Stor
 
 Check these items in order:
 
-1. Confirm Storage API URL is set correctly in Upload page (or `window.ADAMZ_STORAGE_API`).
+1. Confirm Storage API URL is set correctly in `history.html` (or `window.ADAMZ_STORAGE_API`).
 2. Open `<STORAGE_API_URL>/healthz` in browser. It should return JSON like `{"ok":true,...}`.
 3. Ensure backend server is running (`node server.js`) and accessible from your frontend origin.
 4. Set `ALLOWED_ORIGINS` on backend to include your frontend URL (for example `http://localhost:4173`).

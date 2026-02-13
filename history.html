@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ADAMZ | Payment & File History</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>window.ADAMZ_STORAGE_API = window.ADAMZ_STORAGE_API || "";</script>
   </head>
   <body>
@@ -23,11 +24,6 @@
         <p class="small">Sign in with the history username and password configured in your API (`HISTORY_USERNAME`, `HISTORY_PASSWORD`).</p>
 
         <div class="field">
-          <label for="storageApiInput">Storage API URL</label>
-          <input id="storageApiInput" placeholder="https://adamz.onrender.com" />
-        </div>
-
-        <div class="field">
           <label for="historyUsername">Username</label>
           <input id="historyUsername" />
         </div>
@@ -41,10 +37,25 @@
           <button id="loginBtn" class="btn" type="button">Open History</button>
           <span id="loginStatus" class="small"></span>
         </div>
+
+        <div id="historyStorageControls" hidden>
+          <div class="field" style="margin-top:1rem;">
+            <label for="storageApiInput">Storage API URL</label>
+            <input id="storageApiInput" placeholder="https://adamz.onrender.com" />
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.5rem;">
+            <button id="saveStorageApiBtn" class="btn btn-sm" type="button">Save Storage API URL</button>
+            <button id="clearStorageApiBtn" class="btn btn-sm" type="button">Clear</button>
+            <span id="storageApiStatus" class="small"></span>
+          </div>
+        </div>
       </section>
 
       <section class="panel" id="historyPanel" hidden>
         <h2 style="margin-top:0;">Transactions</h2>
+        <div style="margin-bottom:0.75rem; display:flex; gap:0.5rem; align-items:center;">
+          <button id="exportHistoryExcelBtn" class="btn btn-sm" type="button">Export History to Excel</button>
+        </div>
         <table id="transactionTable">
           <thead>
             <tr><th>Transaction</th><th>Paid at</th><th>Uploaded at</th><th>File</th><th>Actions</th></tr>

@@ -2,14 +2,53 @@ const STORAGE_KEY = 'adamzPaymentTransactions';
 const STORAGE_API_KEY = 'adamzStorageApiBase';
 
 const storageApiInput = document.getElementById('storageApiInput');
+const saveStorageApiBtn = document.getElementById('saveStorageApiBtn');
+const clearStorageApiBtn = document.getElementById('clearStorageApiBtn');
+const storageApiStatus = document.getElementById('storageApiStatus');
 const historyUsername = document.getElementById('historyUsername');
 const historyPassword = document.getElementById('historyPassword');
 const loginBtn = document.getElementById('loginBtn');
 const loginStatus = document.getElementById('loginStatus');
 const historyPanel = document.getElementById('historyPanel');
 const transactionTableBody = document.querySelector('#transactionTable tbody');
+const exportHistoryExcelBtn = document.getElementById('exportHistoryExcelBtn');
+const historyStorageControls = document.getElementById('historyStorageControls');
 
 storageApiInput.value = String(window.ADAMZ_STORAGE_API || localStorage.getItem(STORAGE_API_KEY) || '').replace(/\/$/, '');
+
+saveStorageApiBtn.addEventListener('click', () => {
+  if (historyStorageControls?.hidden) return;
+  const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
+  if (!base || !/^https?:\/\//i.test(base)) {
+    storageApiStatus.textContent = 'Enter a valid Storage API URL.';
+    storageApiStatus.className = 'small status-warn';
+    return;
+  }
+
+  localStorage.setItem(STORAGE_API_KEY, base);
+  window.ADAMZ_STORAGE_API = base;
+  renderStorageApiStatus();
+});
+
+clearStorageApiBtn.addEventListener('click', () => {
+  if (historyStorageControls?.hidden) return;
+  localStorage.removeItem(STORAGE_API_KEY);
+  window.ADAMZ_STORAGE_API = '';
+  storageApiInput.value = '';
+  renderStorageApiStatus();
+});
+
+function renderStorageApiStatus() {
+  if (!storageApiStatus || !storageApiInput) return;
+  const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
+  if (base) {
+    storageApiStatus.textContent = `Current: ${base}`;
+    storageApiStatus.className = 'small status-ok';
+  } else {
+    storageApiStatus.textContent = 'Storage API URL not set.';
+    storageApiStatus.className = 'small status-warn';
+  }
+}
 
 loginBtn.addEventListener('click', async () => {
   const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
@@ -44,12 +83,45 @@ loginBtn.addEventListener('click', async () => {
     localStorage.setItem(STORAGE_API_KEY, base);
     loginStatus.textContent = 'Authenticated. Loading local transaction history...';
     loginStatus.className = 'small status-ok';
+    if (historyStorageControls) historyStorageControls.hidden = false;
+    renderStorageApiStatus();
     historyPanel.hidden = false;
     renderTransactionTable();
   } catch (error) {
     loginStatus.textContent = 'Unable to reach Storage API.';
     loginStatus.className = 'small status-warn';
   }
+});
+
+
+exportHistoryExcelBtn.addEventListener('click', () => {
+  const transactions = loadTransactions();
+  if (!transactions.length) {
+    loginStatus.textContent = 'No transaction data to export.';
+    loginStatus.className = 'small status-warn';
+    return;
+  }
+
+  const rows = transactions.map((tx) => ({
+    transactionId: tx.id,
+    status: tx.status || '',
+    storageStatus: tx.storageStatus || '',
+    paidAt: tx.paidAt || '',
+    uploadedAt: tx.uploadedAt || '',
+    fileName: tx.fileName || '',
+    originalUrl: tx.artifacts?.originalUrl || '',
+    cleanedCsvUrl: tx.artifacts?.cleanedCsvUrl || '',
+    cleanedExcelUrl: tx.artifacts?.cleanedExcelUrl || '',
+    dashboardPdfUrl: tx.artifacts?.dashboardPdfUrl || ''
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'History');
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+  const fileName = `adamz_history_${stamp}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
 });
 
 transactionTableBody.addEventListener('click', (event) => {

@@ -277,3 +277,43 @@ th { background: #eaf1ff; }
   font-size: 0.78rem;
   min-width: auto;
 }
+
+
+.processing-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+
+.processing-overlay.hidden {
+  display: none;
+}
+
+.processing-card {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 10px 25px rgba(2, 6, 23, 0.25);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #cbd5e1;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

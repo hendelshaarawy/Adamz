@@ -19,8 +19,7 @@
           <a href="index.html" class="nav-link">Home</a>
           <a href="#payment" class="nav-link">Payment</a>
           <a href="#insights" class="nav-link">Insights</a>
-          <a href="history.html" class="nav-link">History</a>
-        </div>
+                  </div>
       </nav>
     </header>
 
@@ -64,16 +63,7 @@
           <span id="uploadStatus" class="small"></span>
           <span id="uploadQuota" class="small quota-pill">Remaining paid uploads: 0</span>
         </div>
-        <div class="field" style="margin-top:1rem;">
-          <label for="storageApiInput">Storage API URL (where <code>server.js</code> runs)</label>
-          <input id="storageApiInput" placeholder="https://your-storage-api.example.com" />
-        </div>
-        <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.75rem;">
-          <button id="saveStorageApiBtn" class="btn btn-sm" type="button">Save Storage API URL</button>
-          <button id="clearStorageApiBtn" class="btn btn-sm" type="button">Clear</button>
-          <span id="storageApiStatus" class="small"></span>
-        </div>
-        <p class="small" style="margin-top:0.5rem;">Payment & file history moved to <a href="history.html">History page</a>.</p>
+        
       </section>
 
       <section class="panel hidden" id="insights">
@@ -145,6 +135,14 @@
         <a href="support.html">Support</a>
       </div>
     </footer>
+
+
+    <div id="processingOverlay" class="processing-overlay hidden" aria-live="polite" aria-busy="true">
+      <div class="processing-card">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Generating insights dashboard… please wait.</p>
+      </div>
+    </div>
 
     <script src="upload.js"></script>
   </body>

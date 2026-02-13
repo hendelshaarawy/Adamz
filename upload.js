@@ -9,10 +9,7 @@ const finalConclusion = document.getElementById('finalConclusion');
 const downloadCsvBtn = document.getElementById('downloadCsvBtn');
 const downloadExcelBtn = document.getElementById('downloadExcelBtn');
 const downloadDashboardBtn = document.getElementById('downloadDashboardBtn');
-const storageApiInput = document.getElementById('storageApiInput');
-const saveStorageApiBtn = document.getElementById('saveStorageApiBtn');
-const clearStorageApiBtn = document.getElementById('clearStorageApiBtn');
-const storageApiStatus = document.getElementById('storageApiStatus');
+const processingOverlay = document.getElementById('processingOverlay');
 
 let isPaid = false;
 let remainingAnalyses = 0;
@@ -24,7 +21,7 @@ let currentTransactionId = null;
 const STORAGE_KEY = 'adamzPaymentTransactions';
 const STORAGE_API_KEY = 'adamzStorageApiBase';
 const transactions = loadTransactions();
-let STORAGE_API_BASE = resolveStorageApiBase();
+let STORAGE_API_BASE = getStorageApiBase();
 
 const cardExpInput = document.getElementById('cardExp');
 cardExpInput.addEventListener('input', () => {
@@ -33,59 +30,17 @@ cardExpInput.addEventListener('input', () => {
 });
 
 updateQuotaLabel();
-initializeStorageApiControls();
 initializeDemoDashboardIfRequested();
 
 
-function resolveStorageApiBase() {
-  const fromWindow = String(window.ADAMZ_STORAGE_API || '').trim();
-  const fromLocal = String(localStorage.getItem(STORAGE_API_KEY) || '').trim();
-  return (fromWindow || fromLocal).replace(/\/$/, '');
+
+function getStorageApiBase() {
+  return String(window.ADAMZ_STORAGE_API || localStorage.getItem(STORAGE_API_KEY) || '').trim().replace(/\/$/, '');
 }
 
-function initializeStorageApiControls() {
-  if (storageApiInput) storageApiInput.value = STORAGE_API_BASE;
-  renderStorageApiStatus();
-
-  saveStorageApiBtn?.addEventListener('click', () => {
-    const raw = String(storageApiInput?.value || '').trim();
-
-    if (!raw) {
-      storageApiStatus.textContent = 'Please enter a URL.';
-      storageApiStatus.className = 'small status-warn';
-      return;
-    }
-
-    if (!/^https?:\/\//i.test(raw)) {
-      storageApiStatus.textContent = 'Storage API URL must start with http:// or https://';
-      storageApiStatus.className = 'small status-warn';
-      return;
-    }
-
-    STORAGE_API_BASE = raw.replace(/\/$/, '');
-    localStorage.setItem(STORAGE_API_KEY, STORAGE_API_BASE);
-    renderStorageApiStatus();
-  });
-
-  clearStorageApiBtn?.addEventListener('click', () => {
-    STORAGE_API_BASE = '';
-    localStorage.removeItem(STORAGE_API_KEY);
-    if (storageApiInput) storageApiInput.value = '';
-    renderStorageApiStatus();
-  });
-}
-
-function renderStorageApiStatus() {
-  if (!storageApiStatus) return;
-
-  if (STORAGE_API_BASE) {
-    storageApiStatus.textContent = `Connected to: ${STORAGE_API_BASE}`;
-    storageApiStatus.className = 'small status-ok';
-  } else {
-    storageApiStatus.textContent = 'Storage API not configured. Files will stay local only.';
-    storageApiStatus.className = 'small status-warn';
-  }
-
+function setProcessingState(isProcessing) {
+  if (processingOverlay) processingOverlay.classList.toggle('hidden', !isProcessing);
+  analyzeBtn.disabled = isProcessing || !(fileInput.files.length && isPaid && remainingAnalyses > 0);
 }
 
 fileInput.addEventListener('change', () => {
@@ -144,6 +99,7 @@ analyzeBtn.addEventListener('click', async () => {
   if (!file || !isPaid || remainingAnalyses <= 0) return;
 
   try {
+    setProcessingState(true);
     uploadStatus.textContent = `Processing ${file.name}...`;
     lastUploadedName = file.name.replace(/\.[^.]+$/, '') || 'dataset';
 
@@ -158,6 +114,7 @@ analyzeBtn.addEventListener('click', async () => {
     renderCharts(insights);
     renderConclusion(insights);
     insightsSection.classList.remove('hidden');
+    await waitForChartPaint();
 
     const cleanedCsvBlob = buildCleanedCsvBlob(cleaned);
     const cleanedExcelBlob = buildCleanedExcelBlob(cleaned);
@@ -187,7 +144,7 @@ analyzeBtn.addEventListener('click', async () => {
       }
 
       persistTransactions();
-          }
+    }
 
     remainingAnalyses = 0;
     isPaid = false;
@@ -208,7 +165,9 @@ analyzeBtn.addEventListener('click', async () => {
     if (tx && tx.status === 'paid') {
       tx.status = 'failed';
       persistTransactions();
-          }
+    }
+  } finally {
+    setProcessingState(false);
   }
 });
 
@@ -389,6 +348,22 @@ async function buildDashboardPdfBlob() {
   exportSection.style.width = `${insightsSection.scrollWidth}px`;
   exportSection.style.background = '#ffffff';
   exportSection.style.padding = '8px';
+
+  const sourceCanvases = insightsSection.querySelectorAll('canvas');
+  const exportCanvases = exportSection.querySelectorAll('canvas');
+  exportCanvases.forEach((canvas, index) => {
+    const sourceCanvas = sourceCanvases[index];
+    if (!sourceCanvas) return;
+
+    const image = document.createElement('img');
+    image.src = sourceCanvas.toDataURL('image/png');
+    image.alt = 'Chart snapshot';
+    image.style.display = 'block';
+    image.style.width = `${sourceCanvas.clientWidth || sourceCanvas.width}px`;
+    image.style.height = `${sourceCanvas.clientHeight || sourceCanvas.height}px`;
+
+    canvas.replaceWith(image);
+  });
 
   const sandbox = document.createElement('div');
   sandbox.style.position = 'fixed';

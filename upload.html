@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADAMZ | Advanced Data & Analytics Made Zimple</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>window.ADAMZ_STORAGE_API = window.ADAMZ_STORAGE_API || "";</script>
+  </head>
+  <body>
+    <header class="hero" style="padding-bottom: 1.5rem;">
+      <nav class="nav">
+        <div class="logo">ADAMZ <span class="logo-tag">Advanced Data & Analytics Made Zimple</span></div>
+        <div class="nav-actions">
+          <a href="index.html" class="nav-link">Home</a>
+          <a href="#payment" class="nav-link">Payment</a>
+          <a href="#insights" class="nav-link">Insights</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="upload-layout">
+      <section class="panel" id="payment">
+        <h1 style="margin-top:0;">Pay $5 and upload your file</h1>
+        <p class="small">Simple card checkout (demo implementation). Bank destination setup is handled securely on the backend.</p>
+        <form id="paymentForm" class="payment-form-inline">
+          <div class="field">
+            <label for="cardName">Cardholder name</label>
+            <input id="cardName" required />
+          </div>
+          <div class="field">
+            <label for="cardNumber">Card number</label>
+            <input id="cardNumber" inputmode="numeric" placeholder="4242 4242 4242 4242" required />
+          </div>
+          <div class="field">
+            <label for="cardExp">Expiry (MM/YY)</label>
+            <input id="cardExp" placeholder="12/30" required />
+          </div>
+          <div class="field">
+            <label for="cardCvc">CVC</label>
+            <input id="cardCvc" inputmode="numeric" placeholder="123" required />
+          </div>
+          <div class="field checkbox-field">
+            <label class="small"><input type="checkbox" id="agreePay" /> I agree to pay $5 for this upload.</label>
+          </div>
+          <button class="btn" type="submit">Pay $5</button>
+          <span id="paymentStatus" class="small status-warn">Payment required before analysis.</span>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin-top:0;">Upload</h2>
+        <div class="field">
+          <label for="fileInput">CSV or Excel file</label>
+          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+        </div>
+        <div style="margin-top:0.75rem; display:flex; gap:0.75rem; align-items:center;">
+          <button id="analyzeBtn" class="btn" disabled>Generate insights</button>
+          <span id="uploadStatus" class="small"></span>
+          <span id="uploadQuota" class="small quota-pill">Remaining paid uploads: 0</span>
+        </div>
+      </section>
+
+      <section class="panel" id="transactions">
+        <h2 style="margin-top:0;">Payment & File History</h2>
+        <p class="small">Each paid transaction is logged with timestamps and cloud links for original/cleaned files and dashboard PDF.</p>
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label for="storageApiInput">Storage API URL (where <code>server.js</code> runs)</label>
+          <input id="storageApiInput" placeholder="https://your-storage-api.example.com" />
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+          <button id="saveStorageApiBtn" class="btn btn-sm" type="button">Save Storage API URL</button>
+          <button id="clearStorageApiBtn" class="btn btn-sm" type="button">Clear</button>
+          <span id="storageApiStatus" class="small"></span>
+        </div>
+        <table id="transactionTable">
+          <thead>
+            <tr><th>Transaction</th><th>Paid at</th><th>Uploaded at</th><th>File</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+
+      <section class="panel hidden" id="insights">
+        <h2 style="margin-top:0;">Insights Dashboard</h2>
+        <div id="overview" class="grid"></div>
+
+        <div class="chart-grid chart-grid-xl">
+          <article class="chart-card">
+            <h3>Completeness by Column (%)</h3>
+            <canvas id="completenessChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Numeric Means</h3>
+            <canvas id="numericMeanChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Top Category Distribution</h3>
+            <canvas id="categoryChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Sales/Metric Trend Over Time</h3>
+            <canvas id="trendLineChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Stacked Breakdown by Top Categories</h3>
+            <canvas id="stackedCategoryChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Outlier Radar (z-score style)</h3>
+            <canvas id="outlierChart"></canvas>
+          </article>
+        </div>
+
+        <h3>Missing values by column</h3>
+        <table id="missingTable"><thead><tr><th>Column</th><th>Missing</th><th>Missing %</th></tr></thead><tbody></tbody></table>
+
+        <h3>Numeric summary</h3>
+        <table id="numericTable"><thead><tr><th>Column</th><th>Count</th><th>Mean</th><th>Min</th><th>Max</th><th>Std Dev</th><th>Outliers</th></tr></thead><tbody></tbody></table>
+
+        <h3>Top text categories</h3>
+        <table id="categoryTable"><thead><tr><th>Column</th><th>Top values</th></tr></thead><tbody></tbody></table>
+
+        <article class="conclusion-card">
+          <h3>Final Conclusion</h3>
+          <p id="finalConclusion" class="small">Conclusion will appear after analysis.</p>
+        </article>
+
+        <article class="download-card">
+          <h3>Download cleaned file</h3>
+          <p class="small">Export the cleaned dataset in your preferred format.</p>
+          <div class="download-actions">
+            <button id="downloadCsvBtn" class="btn" disabled>Download cleaned CSV</button>
+            <button id="downloadExcelBtn" class="btn" disabled>Download cleaned Excel</button>
+            <button id="downloadDashboardBtn" class="btn" disabled>Download dashboard (PDF)</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+
+    <footer class="footer">
+      <div>
+        <h3>ADAMZ</h3>
+        <p>Clean data. Clear insights. Beautiful dashboards.</p>
+      </div>
+      <div class="footer-links">
+        <a href="privacy.html">Privacy</a>
+        <a href="security.html">Security</a>
+        <a href="support.html">Support</a>
+      </div>
+    </footer>
+
+    <script src="upload.js"></script>
+  </body>
+</html>

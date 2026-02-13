@@ -239,6 +239,32 @@ in your frontend production page.
 ---
 
 
+## Troubleshooting: `failed to read dockerfile: open Dockerfile: no such file or directory`
+
+This means your platform is trying to build with Docker, but the repo had no `Dockerfile`.
+
+This project now includes a root `Dockerfile` and `.dockerignore`.
+
+Try again with one of these approaches:
+
+1. **Docker deploy mode** (Render/Railway/etc.): redeploy from repo root.
+2. **Native Node deploy mode**: set build `npm install` and start `node server.js` / `npm start`.
+
+Local Docker test:
+
+```bash
+docker build -t adamz-storage-api .
+docker run --rm -p 8080:8080   -e SUPABASE_URL=https://your-project-id.supabase.co   -e SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   -e SUPABASE_BUCKET=adamz-artifacts   -e ALLOWED_ORIGINS=http://localhost:4173   adamz-storage-api
+```
+
+Then verify:
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+---
+
 ## Troubleshooting: `Failed to fetch` in Upload UI
 
 If the Upload page shows `Failed to fetch`, the browser could not reach the Storage API endpoint.

@@ -31,7 +31,7 @@
           <div class="field checkbox-field">
             <label class="small"><input type="checkbox" id="agreePay" /> I agree to pay $5 for this upload.</label>
           </div>
-          <button class="btn" type="submit">Pay $5 with Stripe</button>
+          <button id="payBtn" class="btn" type="submit">Pay $5 with Stripe</button>
           <span id="paymentStatus" class="small status-warn">Payment required before analysis.</span>
         </form>
 
@@ -40,6 +40,7 @@
 
       <section class="panel">
         <h2 style="margin-top:0;">Upload</h2>
+        <p id="paymentGateNotice" class="small status-warn" style="margin:0 0 0.75rem 0;">Payment required before analysis.</p>
         <div class="field">
           <label for="fileInput">CSV or Excel file</label>
           <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />

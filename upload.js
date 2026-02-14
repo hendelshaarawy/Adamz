@@ -1,5 +1,7 @@
 const paymentForm = document.getElementById('paymentForm');
 const paymentStatus = document.getElementById('paymentStatus');
+const payBtn = document.getElementById('payBtn');
+const paymentGateNotice = document.getElementById('paymentGateNotice');
 const fileInput = document.getElementById('fileInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const uploadStatus = document.getElementById('uploadStatus');
@@ -25,8 +27,7 @@ let STORAGE_API_BASE = getStorageApiBase();
 updateQuotaLabel();
 handleStripeReturnFromCheckout();
 initializeDemoDashboardIfRequested();
-
-
+setPaymentUiState({ paid: false });
 
 function getStorageApiBase() {
   return String(window.ADAMZ_STORAGE_API || '').trim().replace(/\/$/, '');
@@ -63,6 +64,29 @@ function getCheckoutReturnBaseUrl() {
   return configuredUrl.toString();
 }
 
+function setPaymentUiState({ paid }) {
+  if (payBtn) payBtn.disabled = !!paid;
+  if (!paymentGateNotice) return;
+
+  if (paid) {
+    paymentGateNotice.textContent = 'Payment successful ($5). You can analyze 1 file now. Pay again after this analysis.';
+    paymentGateNotice.className = 'small status-ok';
+  } else {
+    paymentGateNotice.textContent = 'Payment required before analysis.';
+    paymentGateNotice.className = 'small status-warn';
+  }
+}
+
+function setPaymentStatusMessage(message, isSuccess) {
+  if (!paymentStatus) return;
+  paymentStatus.textContent = message;
+  paymentStatus.className = `small ${isSuccess ? 'status-ok' : 'status-warn'}`;
+}
+
+function resetToPayRequiredMessage() {
+  setPaymentStatusMessage('Payment required before analysis.', false);
+}
+
 function setProcessingState(isProcessing) {
   if (processingOverlay) processingOverlay.classList.toggle('hidden', !isProcessing);
   analyzeBtn.disabled = isProcessing || !(fileInput.files.length && isPaid && remainingAnalyses > 0);
@@ -84,8 +108,7 @@ paymentForm.addEventListener('submit', async (event) => {
   }
 
   if (!STORAGE_API_BASE) {
-    paymentStatus.textContent = 'Storage/API URL is not configured. Set window.ADAMZ_STORAGE_API in app-config.js.';
-    paymentStatus.className = 'small status-warn';
+    setPaymentStatusMessage('Storage/API URL is not configured. Set window.ADAMZ_STORAGE_API in app-config.js.', false);
     return;
   }
 
@@ -93,8 +116,7 @@ paymentForm.addEventListener('submit', async (event) => {
   currentTransactionId = transactionId;
 
   try {
-    paymentStatus.textContent = 'Redirecting to Stripe checkout...';
-    paymentStatus.className = 'small status-ok';
+    setPaymentStatusMessage('Redirecting to Stripe checkout...', true);
 
     const baseUrl = getCheckoutReturnBaseUrl();
     const successUrlObj = new URL(baseUrl);
@@ -106,7 +128,9 @@ paymentForm.addEventListener('submit', async (event) => {
     cancelUrlObj.searchParams.set('checkout', 'cancel');
     cancelUrlObj.searchParams.set('tx', transactionId);
 
-    const successUrl = successUrlObj.toString();
+    const successUrl = successUrlObj
+      .toString()
+      .replace('%7BCHECKOUT_SESSION_ID%7D', '{CHECKOUT_SESSION_ID}');
     const cancelUrl = cancelUrlObj.toString();
 
     const response = await fetch(`${STORAGE_API_BASE}/payments/create-checkout-session`, {
@@ -126,8 +150,7 @@ paymentForm.addEventListener('submit', async (event) => {
 
     window.location.href = checkoutUrl;
   } catch (error) {
-    paymentStatus.textContent = error.message || 'Payment initialization failed. Check STRIPE_SECRET_KEY on the API.';
-    paymentStatus.className = 'small status-warn';
+    setPaymentStatusMessage(error.message || 'Payment initialization failed. Check STRIPE_SECRET_KEY on the API.', false);
   }
 });
 
@@ -139,8 +162,8 @@ async function handleStripeReturnFromCheckout() {
   const sessionId = params.get('session_id');
 
   if (checkout === 'cancel') {
-    paymentStatus.textContent = 'Stripe checkout was canceled.';
-    paymentStatus.className = 'small status-warn';
+    setPaymentStatusMessage('Stripe checkout was canceled.', false);
+    setPaymentUiState({ paid: false });
     window.history.replaceState({}, '', window.location.pathname);
     return;
   }
@@ -149,9 +172,12 @@ async function handleStripeReturnFromCheckout() {
 
   try {
     const response = await fetch(`${STORAGE_API_BASE}/payments/confirm-session?sessionId=${encodeURIComponent(sessionId)}&transactionId=${encodeURIComponent(transactionId)}`);
-    if (!response.ok) throw new Error('Unable to verify payment.');
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = result?.error || `Unable to verify payment (HTTP ${response.status}).`;
+      throw new Error(message);
+    }
 
-    const result = await response.json();
     if (!result.paid) throw new Error('Payment is not marked paid yet.');
 
     isPaid = true;
@@ -173,12 +199,12 @@ async function handleStripeReturnFromCheckout() {
       persistTransactions();
     }
 
-    paymentStatus.textContent = 'Payment successful ($5). You can analyze 1 file before paying again.';
-    paymentStatus.className = 'small status-ok';
+    setPaymentStatusMessage('Payment successful ($5). You can analyze 1 file before paying again.', true);
+    setPaymentUiState({ paid: true });
     updateQuotaLabel();
   } catch (error) {
-    paymentStatus.textContent = error.message || 'Unable to verify payment session.';
-    paymentStatus.className = 'small status-warn';
+    setPaymentStatusMessage(error.message || 'Unable to verify payment session.', false);
+    setPaymentUiState({ paid: false });
   } finally {
     window.history.replaceState({}, '', window.location.pathname);
   }
@@ -239,6 +265,10 @@ analyzeBtn.addEventListener('click', async () => {
     remainingAnalyses = 0;
     isPaid = false;
     analyzeBtn.disabled = true;
+    setPaymentUiState({ paid: false });
+    resetToPayRequiredMessage();
+    const agreePay = document.getElementById('agreePay');
+    if (agreePay) agreePay.checked = false;
 
     uploadStatus.textContent = `Done. Loaded ${cleaned.length} rows. You used your paid upload. Please pay again to continue.`;
     uploadStatus.className = 'small status-warn';

@@ -129,6 +129,10 @@ app.get('/payments/confirm-session', async (req, res) => {
       return res.status(400).json({ error: 'sessionId and transactionId are required.' });
     }
 
+    if (!sessionId.startsWith('cs_')) {
+      return res.status(400).json({ error: 'Invalid sessionId format. Expected a Stripe Checkout session id (cs_...).'});
+    }
+
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const paid = session.payment_status === 'paid' && session.metadata?.transactionId === transactionId;
 
@@ -140,7 +144,8 @@ app.get('/payments/confirm-session', async (req, res) => {
     });
   } catch (error) {
     console.error('confirm-session error:', error);
-    return res.status(500).json({ error: 'Unable to confirm payment session.' });
+    const details = error?.raw?.message || error?.message || 'Unknown Stripe error.';
+    return res.status(500).json({ error: `Unable to confirm payment session. ${details}` });
   }
 });
 

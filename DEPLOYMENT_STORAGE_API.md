@@ -66,6 +66,7 @@ Optional:
 - `ALLOWED_ORIGINS` (comma-separated, use `*` only for quick testing)
 - `SUPABASE_SIGNED_URL_TTL_SECONDS` (response metadata; default `7200`)
 - `HISTORY_USERNAME` / `HISTORY_PASSWORD` (optional, required to unlock `history.html`)
+- `STRIPE_SECRET_KEY` (required for real Stripe checkout)
 
 ### Beginner quick path (recommended)
 
@@ -215,6 +216,24 @@ Expected JSON shape:
   "expiresInSeconds": 7200
 }
 ```
+
+
+## Stripe checkout (real payments)
+
+This project supports real Stripe-hosted checkout via:
+
+- `POST /payments/create-checkout-session`
+- `GET /payments/confirm-session`
+
+Set `STRIPE_SECRET_KEY` on your API host.
+
+Frontend flow:
+1. User clicks **Pay $5 with Stripe** on `upload.html`.
+2. API creates a Stripe Checkout Session and redirects user to Stripe.
+3. On return to `upload.html`, payment is confirmed via `session_id` + `transactionId`.
+4. Upload is unlocked only after successful payment confirmation.
+
+---
 
 ## 7) Wire frontend to the backend
 

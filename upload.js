@@ -23,13 +23,8 @@ const STORAGE_API_KEY = 'adamzStorageApiBase';
 const transactions = loadTransactions();
 let STORAGE_API_BASE = getStorageApiBase();
 
-const cardExpInput = document.getElementById('cardExp');
-cardExpInput.addEventListener('input', () => {
-  const digits = cardExpInput.value.replace(/\D/g, '').slice(0, 4);
-  cardExpInput.value = digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-});
-
 updateQuotaLabel();
+handleStripeReturnFromCheckout();
 initializeDemoDashboardIfRequested();
 
 
@@ -48,51 +43,102 @@ fileInput.addEventListener('change', () => {
   uploadStatus.textContent = '';
 });
 
-paymentForm.addEventListener('submit', (event) => {
+paymentForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const cardName = document.getElementById('cardName').value.trim();
-  const cardNumber = document.getElementById('cardNumber').value.replace(/\s+/g, '');
-  const cardExp = document.getElementById('cardExp').value.trim();
-  const cardCvc = document.getElementById('cardCvc').value.trim();
   const agreePay = document.getElementById('agreePay').checked;
-
-  if (!cardName || !/^\d{13,19}$/.test(cardNumber) || !/^\d{2}\/\d{2}$/.test(cardExp) || !/^\d{3,4}$/.test(cardCvc)) {
-    paymentStatus.textContent = 'Enter valid card details.';
-    paymentStatus.className = 'small status-warn';
-    return;
-  }
-
   if (!agreePay) {
     paymentStatus.textContent = 'You must confirm the $5 payment.';
     paymentStatus.className = 'small status-warn';
     return;
   }
 
-  isPaid = true;
-  remainingAnalyses = 1;
-  analyzeBtn.disabled = !fileInput.files.length;
+  if (!STORAGE_API_BASE) {
+    paymentStatus.textContent = 'Storage/API URL is not configured. Set it on history.html first.';
+    paymentStatus.className = 'small status-warn';
+    return;
+  }
 
-  const paidAt = new Date().toISOString();
   const transactionId = `TX-${Date.now()}`;
   currentTransactionId = transactionId;
 
-  transactions.unshift({
-    id: transactionId,
-    paidAt,
-    uploadedAt: null,
-    fileName: null,
-    status: 'paid',
-    storageStatus: STORAGE_API_BASE ? 'pending upload' : 'storage_not_configured',
-    artifacts: { originalUrl: null, cleanedCsvUrl: null, cleanedExcelUrl: null, dashboardPdfUrl: null }
-  });
+  try {
+    paymentStatus.textContent = 'Redirecting to Stripe checkout...';
+    paymentStatus.className = 'small status-ok';
 
-  persistTransactions();
-  
-  paymentStatus.textContent = 'Payment successful ($5). You can analyze 1 file before paying again.';
-  paymentStatus.className = 'small status-ok';
-  updateQuotaLabel();
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    const successUrl = `${baseUrl}?checkout=success&tx=${encodeURIComponent(transactionId)}&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${baseUrl}?checkout=cancel&tx=${encodeURIComponent(transactionId)}`;
+
+    const response = await fetch(`${STORAGE_API_BASE}/payments/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactionId, successUrl, cancelUrl })
+    });
+
+    if (!response.ok) throw new Error('Unable to start Stripe checkout.');
+    const { checkoutUrl } = await response.json();
+    if (!checkoutUrl) throw new Error('Missing checkout URL from API.');
+
+    window.location.href = checkoutUrl;
+  } catch (error) {
+    paymentStatus.textContent = error.message || 'Payment initialization failed.';
+    paymentStatus.className = 'small status-warn';
+  }
 });
+
+
+async function handleStripeReturnFromCheckout() {
+  const params = new URLSearchParams(window.location.search);
+  const checkout = params.get('checkout');
+  const transactionId = params.get('tx');
+  const sessionId = params.get('session_id');
+
+  if (checkout === 'cancel') {
+    paymentStatus.textContent = 'Stripe checkout was canceled.';
+    paymentStatus.className = 'small status-warn';
+    window.history.replaceState({}, '', window.location.pathname);
+    return;
+  }
+
+  if (checkout !== 'success' || !transactionId || !sessionId || !STORAGE_API_BASE) return;
+
+  try {
+    const response = await fetch(`${STORAGE_API_BASE}/payments/confirm-session?sessionId=${encodeURIComponent(sessionId)}&transactionId=${encodeURIComponent(transactionId)}`);
+    if (!response.ok) throw new Error('Unable to verify payment.');
+
+    const result = await response.json();
+    if (!result.paid) throw new Error('Payment is not marked paid yet.');
+
+    isPaid = true;
+    remainingAnalyses = 1;
+    analyzeBtn.disabled = !fileInput.files.length;
+    currentTransactionId = transactionId;
+
+    const alreadyExists = transactions.some((tx) => tx.id === transactionId);
+    if (!alreadyExists) {
+      transactions.unshift({
+        id: transactionId,
+        paidAt: new Date().toISOString(),
+        uploadedAt: null,
+        fileName: null,
+        status: 'paid',
+        storageStatus: STORAGE_API_BASE ? 'pending upload' : 'storage_not_configured',
+        artifacts: { originalUrl: null, cleanedCsvUrl: null, cleanedExcelUrl: null, dashboardPdfUrl: null }
+      });
+      persistTransactions();
+    }
+
+    paymentStatus.textContent = 'Payment successful ($5). You can analyze 1 file before paying again.';
+    paymentStatus.className = 'small status-ok';
+    updateQuotaLabel();
+  } catch (error) {
+    paymentStatus.textContent = error.message || 'Unable to verify payment session.';
+    paymentStatus.className = 'small status-warn';
+  } finally {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}
 
 analyzeBtn.addEventListener('click', async () => {
   const file = fileInput.files[0];

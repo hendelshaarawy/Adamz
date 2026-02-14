@@ -26,28 +26,12 @@
     <main class="upload-layout">
       <section class="panel" id="payment">
         <h1 style="margin-top:0;">Pay $5 and upload your file</h1>
-        <p class="small">Simple card checkout (demo implementation). Bank destination setup is handled securely on the backend.</p>
+        <p class="small">Secure checkout is powered by Stripe. Click below to complete payment, then return to this page to continue.</p>
         <form id="paymentForm" class="payment-form-inline">
-          <div class="field">
-            <label for="cardName">Cardholder name</label>
-            <input id="cardName" required />
-          </div>
-          <div class="field">
-            <label for="cardNumber">Card number</label>
-            <input id="cardNumber" inputmode="numeric" placeholder="4242 4242 4242 4242" required />
-          </div>
-          <div class="field">
-            <label for="cardExp">Expiry (MM/YY)</label>
-            <input id="cardExp" placeholder="12/30" required />
-          </div>
-          <div class="field">
-            <label for="cardCvc">CVC</label>
-            <input id="cardCvc" inputmode="numeric" placeholder="123" required />
-          </div>
           <div class="field checkbox-field">
             <label class="small"><input type="checkbox" id="agreePay" /> I agree to pay $5 for this upload.</label>
           </div>
-          <button class="btn" type="submit">Pay $5</button>
+          <button class="btn" type="submit">Pay $5 with Stripe</button>
           <span id="paymentStatus" class="small status-warn">Payment required before analysis.</span>
         </form>
       </section>

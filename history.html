@@ -6,7 +6,7 @@
     <title>ADAMZ | Payment & File History</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script>window.ADAMZ_STORAGE_API = window.ADAMZ_STORAGE_API || "";</script>
+    <script src="app-config.js"></script>
   </head>
   <body>
     <header class="hero" style="padding-bottom: 1.5rem;">
@@ -38,17 +38,7 @@
           <span id="loginStatus" class="small"></span>
         </div>
 
-        <div id="historyStorageControls" hidden>
-          <div class="field" style="margin-top:1rem;">
-            <label for="storageApiInput">Storage API URL</label>
-            <input id="storageApiInput" placeholder="https://adamz.onrender.com" />
-          </div>
-          <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.5rem;">
-            <button id="saveStorageApiBtn" class="btn btn-sm" type="button">Save Storage API URL</button>
-            <button id="clearStorageApiBtn" class="btn btn-sm" type="button">Clear</button>
-            <span id="storageApiStatus" class="small"></span>
-          </div>
-        </div>
+        
       </section>
 
       <section class="panel" id="historyPanel" hidden>

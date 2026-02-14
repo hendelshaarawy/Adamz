@@ -1,10 +1,5 @@
 const STORAGE_KEY = 'adamzPaymentTransactions';
-const STORAGE_API_KEY = 'adamzStorageApiBase';
 
-const storageApiInput = document.getElementById('storageApiInput');
-const saveStorageApiBtn = document.getElementById('saveStorageApiBtn');
-const clearStorageApiBtn = document.getElementById('clearStorageApiBtn');
-const storageApiStatus = document.getElementById('storageApiStatus');
 const historyUsername = document.getElementById('historyUsername');
 const historyPassword = document.getElementById('historyPassword');
 const loginBtn = document.getElementById('loginBtn');
@@ -12,51 +7,15 @@ const loginStatus = document.getElementById('loginStatus');
 const historyPanel = document.getElementById('historyPanel');
 const transactionTableBody = document.querySelector('#transactionTable tbody');
 const exportHistoryExcelBtn = document.getElementById('exportHistoryExcelBtn');
-const historyStorageControls = document.getElementById('historyStorageControls');
 
-storageApiInput.value = String(window.ADAMZ_STORAGE_API || localStorage.getItem(STORAGE_API_KEY) || '').replace(/\/$/, '');
-
-saveStorageApiBtn.addEventListener('click', () => {
-  if (historyStorageControls?.hidden) return;
-  const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
-  if (!base || !/^https?:\/\//i.test(base)) {
-    storageApiStatus.textContent = 'Enter a valid Storage API URL.';
-    storageApiStatus.className = 'small status-warn';
-    return;
-  }
-
-  localStorage.setItem(STORAGE_API_KEY, base);
-  window.ADAMZ_STORAGE_API = base;
-  renderStorageApiStatus();
-});
-
-clearStorageApiBtn.addEventListener('click', () => {
-  if (historyStorageControls?.hidden) return;
-  localStorage.removeItem(STORAGE_API_KEY);
-  window.ADAMZ_STORAGE_API = '';
-  storageApiInput.value = '';
-  renderStorageApiStatus();
-});
-
-function renderStorageApiStatus() {
-  if (!storageApiStatus || !storageApiInput) return;
-  const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
-  if (base) {
-    storageApiStatus.textContent = `Current: ${base}`;
-    storageApiStatus.className = 'small status-ok';
-  } else {
-    storageApiStatus.textContent = 'Storage API URL not set.';
-    storageApiStatus.className = 'small status-warn';
-  }
-}
+const STORAGE_API_BASE = String(window.ADAMZ_STORAGE_API || '').trim().replace(/\/$/, '');
 
 loginBtn.addEventListener('click', async () => {
-  const base = String(storageApiInput.value || '').trim().replace(/\/$/, '');
   const username = String(historyUsername.value || '').trim();
   const password = String(historyPassword.value || '').trim();
 
-  if (!base || !/^https?:\/\//i.test(base)) {
-    loginStatus.textContent = 'Enter a valid Storage API URL.';
+  if (!STORAGE_API_BASE || !/^https?:\/\//i.test(STORAGE_API_BASE)) {
+    loginStatus.textContent = 'Storage/API URL is not configured. Set window.ADAMZ_STORAGE_API in app-config.js.';
     loginStatus.className = 'small status-warn';
     return;
   }
@@ -69,7 +28,7 @@ loginBtn.addEventListener('click', async () => {
 
   try {
     const token = btoa(`${username}:${password}`);
-    const response = await fetch(`${base}/history/auth-check`, {
+    const response = await fetch(`${STORAGE_API_BASE}/history/auth-check`, {
       method: 'GET',
       headers: { Authorization: `Basic ${token}` }
     });
@@ -80,11 +39,8 @@ loginBtn.addEventListener('click', async () => {
       return;
     }
 
-    localStorage.setItem(STORAGE_API_KEY, base);
     loginStatus.textContent = 'Authenticated. Loading local transaction history...';
     loginStatus.className = 'small status-ok';
-    if (historyStorageControls) historyStorageControls.hidden = false;
-    renderStorageApiStatus();
     historyPanel.hidden = false;
     renderTransactionTable();
   } catch (error) {
@@ -92,7 +48,6 @@ loginBtn.addEventListener('click', async () => {
     loginStatus.className = 'small status-warn';
   }
 });
-
 
 exportHistoryExcelBtn.addEventListener('click', () => {
   const transactions = loadTransactions();

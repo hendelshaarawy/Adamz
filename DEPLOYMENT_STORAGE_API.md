@@ -276,6 +276,26 @@ in your frontend production page.
 
 ---
 
+## Troubleshooting: `Unable to start Stripe checkout.`
+
+If upload page shows this message:
+
+1. Ensure `STRIPE_SECRET_KEY` is set on API host.
+2. Ensure Storage API URL points to your backend (not Supabase URL).
+3. Open `<API_URL>/healthz` and verify it returns `{"ok":true,...}`.
+4. Retry payment and inspect API response message shown in UI (it now surfaces backend error text).
+5. Common Stripe causes for this error:
+   - invalid `STRIPE_SECRET_KEY` (wrong key or test/live mismatch)
+   - restricted/disabled Stripe account
+   - invalid success/cancel URL format
+   - API key does not have permission for Checkout Sessions
+6. If Stripe reports `url_invalid` for `success_url` or `cancel_url`, do **not** run `upload.html` directly from `file://` without configuring a public return URL.
+   - On `upload.html`, set **Public App URL (Stripe return URL fallback)** to your deployed `https://.../upload.html` and save.
+   - (Optional) You can also set the same value in `history.html` under **Public App URL (for Stripe return)**.
+   - Retry payment.
+
+---
+
 ## Troubleshooting: `failed to read dockerfile: open Dockerfile: no such file or directory`
 
 This means your platform is trying to build with Docker, but the repo had no `Dockerfile`.

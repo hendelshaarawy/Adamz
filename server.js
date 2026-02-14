@@ -114,7 +114,8 @@ app.post('/payments/create-checkout-session', async (req, res) => {
     return res.status(200).json({ checkoutUrl: session.url, sessionId: session.id });
   } catch (error) {
     console.error('create-checkout-session error:', error);
-    return res.status(500).json({ error: 'Unable to create checkout session.' });
+    const details = error?.raw?.message || error?.message || 'Unknown Stripe error.';
+    return res.status(500).json({ error: `Unable to create checkout session. ${details}` });
   }
 });
 

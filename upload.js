@@ -19,7 +19,6 @@ let lastUploadedName = 'dataset';
 let currentTransactionId = null;
 
 const STORAGE_KEY = 'adamzPaymentTransactions';
-const STORAGE_API_KEY = 'adamzStorageApiBase';
 const transactions = loadTransactions();
 let STORAGE_API_BASE = getStorageApiBase();
 
@@ -30,7 +29,38 @@ initializeDemoDashboardIfRequested();
 
 
 function getStorageApiBase() {
-  return String(window.ADAMZ_STORAGE_API || localStorage.getItem(STORAGE_API_KEY) || '').trim().replace(/\/$/, '');
+  return String(window.ADAMZ_STORAGE_API || '').trim().replace(/\/$/, '');
+}
+
+function getPublicAppUrl() {
+  return String(window.ADAMZ_PUBLIC_APP_URL || '').trim().replace(/\/$/, '');
+}
+
+function isValidHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
+function getCheckoutReturnBaseUrl() {
+  const currentUrl = new URL(window.location.href);
+  const isHttpPage = currentUrl.protocol === 'http:' || currentUrl.protocol === 'https:';
+  if (isHttpPage) {
+    currentUrl.search = '';
+    currentUrl.hash = '';
+    return currentUrl.toString();
+  }
+
+  const configured = getPublicAppUrl();
+  if (!configured) {
+    throw new Error('Stripe checkout return URL is not configured. Set window.ADAMZ_PUBLIC_APP_URL in app-config.js.');
+  }
+
+  if (!isValidHttpUrl(configured)) {
+    throw new Error('Public App URL must start with http:// or https://.');
+  }
+
+  const configuredUrl = new URL(configured);
+
+  return configuredUrl.toString();
 }
 
 function setProcessingState(isProcessing) {
@@ -54,7 +84,7 @@ paymentForm.addEventListener('submit', async (event) => {
   }
 
   if (!STORAGE_API_BASE) {
-    paymentStatus.textContent = 'Storage/API URL is not configured. Set it on history.html first.';
+    paymentStatus.textContent = 'Storage/API URL is not configured. Set window.ADAMZ_STORAGE_API in app-config.js.';
     paymentStatus.className = 'small status-warn';
     return;
   }
@@ -66,9 +96,18 @@ paymentForm.addEventListener('submit', async (event) => {
     paymentStatus.textContent = 'Redirecting to Stripe checkout...';
     paymentStatus.className = 'small status-ok';
 
-    const baseUrl = `${window.location.origin}${window.location.pathname}`;
-    const successUrl = `${baseUrl}?checkout=success&tx=${encodeURIComponent(transactionId)}&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}?checkout=cancel&tx=${encodeURIComponent(transactionId)}`;
+    const baseUrl = getCheckoutReturnBaseUrl();
+    const successUrlObj = new URL(baseUrl);
+    successUrlObj.searchParams.set('checkout', 'success');
+    successUrlObj.searchParams.set('tx', transactionId);
+    successUrlObj.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}');
+
+    const cancelUrlObj = new URL(baseUrl);
+    cancelUrlObj.searchParams.set('checkout', 'cancel');
+    cancelUrlObj.searchParams.set('tx', transactionId);
+
+    const successUrl = successUrlObj.toString();
+    const cancelUrl = cancelUrlObj.toString();
 
     const response = await fetch(`${STORAGE_API_BASE}/payments/create-checkout-session`, {
       method: 'POST',
@@ -76,13 +115,18 @@ paymentForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({ transactionId, successUrl, cancelUrl })
     });
 
-    if (!response.ok) throw new Error('Unable to start Stripe checkout.');
-    const { checkoutUrl } = await response.json();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload?.error || `Unable to start Stripe checkout (HTTP ${response.status}).`;
+      throw new Error(message);
+    }
+
+    const { checkoutUrl } = payload;
     if (!checkoutUrl) throw new Error('Missing checkout URL from API.');
 
     window.location.href = checkoutUrl;
   } catch (error) {
-    paymentStatus.textContent = error.message || 'Payment initialization failed.';
+    paymentStatus.textContent = error.message || 'Payment initialization failed. Check STRIPE_SECRET_KEY on the API.';
     paymentStatus.className = 'small status-warn';
   }
 });

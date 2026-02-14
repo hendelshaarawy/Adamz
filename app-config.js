@@ -5,4 +5,4 @@ window.ADAMZ_STORAGE_API = window.ADAMZ_STORAGE_API || 'https://adamz.onrender.c
 
 // Optional: set only if you run upload.html via file:// and need Stripe return fallback.
 //window.ADAMZ_PUBLIC_APP_URL = window.ADAMZ_PUBLIC_APP_URL || '';
-window.ADAMZ_PUBLIC_APP_URL = 'http://adamz-ai.com/upload.html'; // only if needed
+window.ADAMZ_PUBLIC_APP_URL = 'https://adamz-ai.com/upload.html'; // only if needed

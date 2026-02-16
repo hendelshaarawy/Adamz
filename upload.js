@@ -26,7 +26,7 @@ let STORAGE_API_BASE = getStorageApiBase();
 
 updateQuotaLabel();
 handleStripeReturnFromCheckout();
-initializeDemoDashboardIfRequested();
+initializeDemoDashboardIfRequested().catch(() => {});
 setPaymentUiState({ paid: false });
 
 function getStorageApiBase() {
@@ -261,10 +261,10 @@ analyzeBtn.addEventListener('click', async () => {
     lastCleanedRows = cleaned;
     const insights = computeInsights(cleaned);
 
+    insightsSection.classList.remove('hidden');
     renderInsights(insights);
     renderCharts(insights);
     renderConclusion(insights);
-    insightsSection.classList.remove('hidden');
     await waitForChartPaint();
 
     const cleanedCsvBlob = buildCleanedCsvBlob(cleaned);
@@ -382,17 +382,17 @@ async function uploadArtifactToStorage(transactionId, blobOrFile, fileName) {
   }
 }
 
-function initializeDemoDashboardIfRequested() {
+async function initializeDemoDashboardIfRequested() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('demo') !== '1') return;
 
   const sampleRows = [
-    { Date: '2025-01-01', Region: 'North America Enterprise', Sales: 1200, Cost: 760, Status: 'Won' },
-    { Date: '2025-02-01', Region: 'North America Enterprise', Sales: 1450, Cost: 840, Status: 'Won' },
-    { Date: '2025-03-01', Region: 'Europe Mid-Market', Sales: 1320, Cost: 790, Status: 'Lost' },
-    { Date: '2025-04-01', Region: 'Asia Pacific Enterprise', Sales: 1725, Cost: 930, Status: 'Won' },
-    { Date: '2025-05-01', Region: 'Latin America Emerging', Sales: 1540, Cost: 905, Status: 'Pending' },
-    { Date: '2025-06-01', Region: 'North America Enterprise', Sales: 1980, Cost: 995, Status: 'Won' }
+    { Date: '2025-01-01', Region: 'North America Enterprise', Sales: 1200, Cost: 760, Units: 40, Status: 'Won' },
+    { Date: '2025-02-01', Region: 'North America Enterprise', Sales: 1450, Cost: 840, Units: 45, Status: 'Won' },
+    { Date: '2025-03-01', Region: 'Europe Mid-Market', Sales: 1320, Cost: null, Units: 38, Status: 'Lost' },
+    { Date: '2025-04-01', Region: 'Asia Pacific Enterprise', Sales: 1725, Cost: 930, Units: 56, Status: 'Won' },
+    { Date: '2025-05-01', Region: 'Latin America Emerging', Sales: null, Cost: 905, Units: 49, Status: 'Pending' },
+    { Date: '2025-06-01', Region: 'North America Enterprise', Sales: 4580, Cost: 995, Units: 210, Status: 'Won' }
   ];
 
   isPaid = false;
@@ -402,11 +402,11 @@ function initializeDemoDashboardIfRequested() {
   const insights = computeInsights(sampleRows);
   lastCleanedRows = sampleRows;
   lastUploadedName = 'sample_dashboard_data';
+  insightsSection.classList.remove('hidden');
   renderInsights(insights);
   renderCharts(insights);
   renderConclusion(insights);
-
-  insightsSection.classList.remove('hidden');
+  await waitForChartPaint();
   analyzeBtn.disabled = true;
   paymentStatus.textContent = 'Demo dashboard loaded. Please complete payment to upload and generate insights with your own file.';
   paymentStatus.className = 'small status-ok';
@@ -821,8 +821,26 @@ function renderStackedCategoryChart(insights) {
 function renderOutlierChart(insights) {
   const canvas = document.getElementById('outlierChart');
   const numeric = insights.numericInfo.slice(0, 8);
-  const outlierMeta = buildLabelMeta(numeric.map((i) => i.header));
-  chartRefs.push(new Chart(canvas, { type: 'bar', data: { labels: outlierMeta.short, datasets: [{ label: 'Outlier count', data: numeric.map((i) => i.outlierCount), borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.75)' }] }, options: mergeOptions(baseChartOptions(), { plugins: { tooltip: tooltipWithFullLabels(outlierMeta) } }) }));
+  if (!numeric.length) {
+    chartRefs.push(new Chart(canvas, { type: 'bar', data: { labels: ['N/A'], datasets: [{ label: 'No numeric data', data: [0] }] }, options: baseChartOptions() }));
+    return;
+  }
+
+  const outlierCounts = numeric.map((item) => item.outlierCount);
+  const hasOutliers = outlierCounts.some((count) => count > 0);
+  const fallbackRiskScore = numeric.map((item) => Number((item.stdDev / (Math.abs(item.mean) + 1) * 100).toFixed(2)));
+  const values = hasOutliers ? outlierCounts : fallbackRiskScore;
+  const label = hasOutliers ? 'Outlier count' : 'Volatility risk score';
+
+  const outlierMeta = buildLabelMeta(numeric.map((item) => item.header));
+  chartRefs.push(new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: outlierMeta.short,
+      datasets: [{ label, data: values, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.75)' }]
+    },
+    options: mergeOptions(baseChartOptions(), { plugins: { tooltip: tooltipWithFullLabels(outlierMeta) } })
+  }));
 }
 
 

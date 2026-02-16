@@ -87,6 +87,15 @@ function resetToPayRequiredMessage() {
   setPaymentStatusMessage('Payment required before analysis.', false);
 }
 
+function createTimeoutSignal(timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId)
+  };
+}
+
 function setProcessingState(isProcessing) {
   if (processingOverlay) processingOverlay.classList.toggle('hidden', !isProcessing);
   analyzeBtn.disabled = isProcessing || !(fileInput.files.length && isPaid && remainingAnalyses > 0);
@@ -114,8 +123,10 @@ paymentForm.addEventListener('submit', async (event) => {
 
   const transactionId = `TX-${Date.now()}`;
   currentTransactionId = transactionId;
+  let redirected = false;
 
   try {
+    if (payBtn) payBtn.disabled = true;
     setPaymentStatusMessage('Redirecting to Stripe checkout...', true);
 
     const baseUrl = getCheckoutReturnBaseUrl();
@@ -133,11 +144,19 @@ paymentForm.addEventListener('submit', async (event) => {
       .replace('%7BCHECKOUT_SESSION_ID%7D', '{CHECKOUT_SESSION_ID}');
     const cancelUrl = cancelUrlObj.toString();
 
-    const response = await fetch(`${STORAGE_API_BASE}/payments/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transactionId, successUrl, cancelUrl })
-    });
+    const timeout = createTimeoutSignal(25000);
+    let response;
+    try {
+      response = await fetch(`${STORAGE_API_BASE}/payments/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId, successUrl, cancelUrl }),
+        signal: timeout.signal,
+        cache: 'no-store'
+      });
+    } finally {
+      timeout.clear();
+    }
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -147,10 +166,26 @@ paymentForm.addEventListener('submit', async (event) => {
 
     const { checkoutUrl } = payload;
     if (!checkoutUrl) throw new Error('Missing checkout URL from API.');
+    if (!isValidHttpUrl(checkoutUrl)) throw new Error('Checkout URL returned by API is invalid.');
 
-    window.location.href = checkoutUrl;
+    redirected = true;
+    window.location.assign(checkoutUrl);
   } catch (error) {
+    if (error?.name === 'AbortError') {
+      setPaymentStatusMessage('Stripe session request timed out. Please retry in a few seconds.', false);
+      return;
+    }
+
+    if (error?.message === 'Failed to fetch') {
+      setPaymentStatusMessage('Unable to reach payment API. Check API URL/CORS and try again.', false);
+      return;
+    }
+
     setPaymentStatusMessage(error.message || 'Payment initialization failed. Check STRIPE_SECRET_KEY on the API.', false);
+  } finally {
+    if (!redirected && payBtn && !isPaid) {
+      payBtn.disabled = false;
+    }
   }
 });
 
@@ -620,9 +655,63 @@ function computeInsights(rows) {
     .filter(Boolean);
 
   const timeTrend = computeTimeTrend(rows, headers, numericInfo);
+  const correlations = computeCorrelations(rows, numericInfo);
   const totalMissing = missingInfo.reduce((a, i) => a + i.missing, 0);
   const dataQualityScore = Math.max(0, 100 - (totalMissing / (totalRows * totalCols || 1)) * 100);
-  return { rows, totalRows, totalCols, missingInfo, numericInfo, categoryInfo, timeTrend, dataQualityScore };
+  return { rows, totalRows, totalCols, missingInfo, numericInfo, categoryInfo, timeTrend, correlations, dataQualityScore };
+}
+
+
+function getCorrelationStrength(absValue) {
+  if (absValue >= 0.8) return 'Very strong';
+  if (absValue >= 0.6) return 'Strong';
+  if (absValue >= 0.4) return 'Moderate';
+  if (absValue >= 0.2) return 'Weak';
+  return 'Very weak';
+}
+
+function computeCorrelations(rows, numericInfo) {
+  const topNumericHeaders = numericInfo.slice(0, 6).map((item) => item.header);
+  const correlations = [];
+
+  for (let i = 0; i < topNumericHeaders.length; i += 1) {
+    for (let j = i + 1; j < topNumericHeaders.length; j += 1) {
+      const aHeader = topNumericHeaders[i];
+      const bHeader = topNumericHeaders[j];
+      const pairs = rows
+        .map((row) => [row[aHeader], row[bHeader]])
+        .filter(([a, b]) => typeof a === 'number' && Number.isFinite(a) && typeof b === 'number' && Number.isFinite(b));
+
+      if (pairs.length < 3) continue;
+
+      const aMean = pairs.reduce((acc, [a]) => acc + a, 0) / pairs.length;
+      const bMean = pairs.reduce((acc, [, b]) => acc + b, 0) / pairs.length;
+
+      let numerator = 0;
+      let aDenominator = 0;
+      let bDenominator = 0;
+      pairs.forEach(([a, b]) => {
+        const aDiff = a - aMean;
+        const bDiff = b - bMean;
+        numerator += aDiff * bDiff;
+        aDenominator += aDiff * aDiff;
+        bDenominator += bDiff * bDiff;
+      });
+
+      const denominator = Math.sqrt(aDenominator * bDenominator);
+      if (!denominator) continue;
+
+      const value = Number((numerator / denominator).toFixed(3));
+      correlations.push({
+        pair: `${aHeader} ↔ ${bHeader}`,
+        value,
+        absValue: Math.abs(value),
+        strength: getCorrelationStrength(Math.abs(value))
+      });
+    }
+  }
+
+  return correlations.sort((a, b) => b.absValue - a.absValue).slice(0, 8);
 }
 
 function computeTimeTrend(rows, headers, numericInfo) {
@@ -653,17 +742,18 @@ function computeTimeTrend(rows, headers, numericInfo) {
 }
 
 function renderInsights(insights) {
-  const { totalRows, totalCols, missingInfo, numericInfo, categoryInfo, dataQualityScore } = insights;
-  renderOverview(totalRows, totalCols, missingInfo, numericInfo, dataQualityScore);
+  const { totalRows, totalCols, missingInfo, numericInfo, categoryInfo, correlations, dataQualityScore } = insights;
+  renderOverview(totalRows, totalCols, missingInfo, numericInfo, correlations, dataQualityScore);
   renderTable('missingTable', missingInfo, ({ header, missing, percent }) => [header, missing, `${percent}%`]);
   renderTable('numericTable', numericInfo, ({ header, count, mean, min, max, stdDev, outlierCount }) => [header, count, mean, min, max, stdDev, outlierCount], 'No numeric columns found.');
   renderTable('categoryTable', categoryInfo, ({ header, top }) => [header, top], 'No text columns found.');
+  renderTable('correlationTable', correlations, ({ pair, value, strength }) => [pair, value, strength], 'Not enough numeric overlap to compute correlation insights.');
 }
 
-function renderOverview(totalRows, totalCols, missingInfo, numericInfo, dataQualityScore) {
+function renderOverview(totalRows, totalCols, missingInfo, numericInfo, correlations, dataQualityScore) {
   const totalMissing = missingInfo.reduce((a, i) => a + i.missing, 0);
   const totalOutliers = numericInfo.reduce((a, i) => a + i.outlierCount, 0);
-  const metrics = [['Rows after cleaning', totalRows], ['Columns', totalCols], ['Total missing cells', totalMissing], ['Numeric columns', numericInfo.length], ['Outlier points detected', totalOutliers], ['Data quality score', `${dataQualityScore.toFixed(1)}%`]];
+  const metrics = [['Rows after cleaning', totalRows], ['Columns', totalCols], ['Total missing cells', totalMissing], ['Numeric columns', numericInfo.length], ['Outlier points detected', totalOutliers], ['Top correlations', correlations.length], ['Data quality score', `${dataQualityScore.toFixed(1)}%`]];
   document.getElementById('overview').innerHTML = metrics.map(([label, value]) => `<div class="metric"><p>${label}</p><h3>${value}</h3><span class="small">Auto-generated</span></div>`).join('');
 }
 
@@ -698,6 +788,8 @@ function renderCharts(insights) {
   renderTrendChart(insights);
   renderStackedCategoryChart(insights);
   renderOutlierChart(insights);
+  renderQualityMixChart(insights);
+  renderVolatilityChart(insights);
 }
 
 function renderTrendChart(insights) {
@@ -733,6 +825,52 @@ function renderOutlierChart(insights) {
   chartRefs.push(new Chart(canvas, { type: 'bar', data: { labels: outlierMeta.short, datasets: [{ label: 'Outlier count', data: numeric.map((i) => i.outlierCount), borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.75)' }] }, options: mergeOptions(baseChartOptions(), { plugins: { tooltip: tooltipWithFullLabels(outlierMeta) } }) }));
 }
 
+
+function renderQualityMixChart(insights) {
+  const canvas = document.getElementById('qualityMixChart');
+  if (!canvas) return;
+  const strong = insights.missingInfo.filter((item) => item.completeness >= 90).length;
+  const watch = insights.missingInfo.filter((item) => item.completeness >= 70 && item.completeness < 90).length;
+  const risk = insights.missingInfo.filter((item) => item.completeness < 70).length;
+
+  chartRefs.push(new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: ['High quality columns', 'Watchlist columns', 'At-risk columns'],
+      datasets: [{ data: [strong, watch, risk], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'] }]
+    },
+    options: mergeOptions(baseChartOptions('doughnut'), {})
+  }));
+}
+
+function renderVolatilityChart(insights) {
+  const canvas = document.getElementById('volatilityChart');
+  if (!canvas) return;
+  const numeric = insights.numericInfo.slice(0, 8);
+  if (!numeric.length) {
+    chartRefs.push(new Chart(canvas, { type: 'bar', data: { labels: ['N/A'], datasets: [{ label: 'No numeric data', data: [0] }] }, options: baseChartOptions() }));
+    return;
+  }
+
+  const volatilityMeta = buildLabelMeta(numeric.map((item) => item.header));
+  chartRefs.push(new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: volatilityMeta.short,
+      datasets: [{
+        label: 'Std dev (volatility)',
+        data: numeric.map((item) => item.stdDev),
+        borderColor: '#7c3aed',
+        backgroundColor: 'rgba(124, 58, 237, 0.18)',
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#6d28d9'
+      }]
+    },
+    options: mergeOptions(baseChartOptions(), { plugins: { tooltip: tooltipWithFullLabels(volatilityMeta) } })
+  }));
+}
+
 function renderConclusion(insights) {
   const topNumeric = insights.numericInfo[0];
   const topOutlier = [...insights.numericInfo].sort((a, b) => b.outlierCount - a.outlierCount)[0];
@@ -740,6 +878,7 @@ function renderConclusion(insights) {
   const weakestComplete = [...insights.missingInfo].sort((a, b) => a.completeness - b.completeness)[0];
   const topCategory = insights.categoryInfo[0]?.sorted?.[0];
   const trendNarrative = insights.timeTrend ? `Trend intelligence: ${insights.timeTrend.metricHeader} changed by ${insights.timeTrend.growthPercent}% across ${insights.timeTrend.points.length} time periods (using ${insights.timeTrend.dateHeader}).` : 'Trend intelligence: no reliable date column found, so trend confidence is low until date fields are standardized.';
+  const strongestCorrelation = insights.correlations?.[0];
   finalConclusion.textContent = [
     `Executive summary: this dataset achieved a ${insights.dataQualityScore.toFixed(1)}% quality score after cleaning, indicating ${insights.dataQualityScore >= 85 ? 'strong' : insights.dataQualityScore >= 65 ? 'moderate' : 'high-risk'} analytical readiness.`,
     mostComplete ? `Strength: ${mostComplete.header} is the most reliable column at ${mostComplete.completeness}% completeness.` : '',
@@ -747,6 +886,7 @@ function renderConclusion(insights) {
     topNumeric ? `Primary KPI signal: ${topNumeric.header} leads numeric impact (mean ${topNumeric.mean}, range ${topNumeric.min}–${topNumeric.max}).` : '',
     topOutlier ? `Anomaly watch: ${topOutlier.header} contains ${topOutlier.outlierCount} potential outliers requiring business review.` : '',
     topCategory ? `Behavioral pattern: '${topCategory[0]}' is the dominant category (${topCategory[1]} records), suggesting concentration around this segment.` : '',
+    strongestCorrelation ? `Relationship signal: ${strongestCorrelation.pair} shows a correlation of ${strongestCorrelation.value} (${strongestCorrelation.strength.toLowerCase()} association), helping identify linked performance drivers.` : '',
     trendNarrative,
     'Action plan: (1) remediate the highest-missing columns, (2) validate outliers with domain owners, (3) monitor the time trend KPI weekly, and (4) export the cleaned dataset and dashboard snapshot for reporting.'
   ].filter(Boolean).join(' ');

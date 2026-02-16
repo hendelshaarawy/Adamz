@@ -21,17 +21,32 @@
       <section class="panel legal-panel">
         <h1 style="margin-top:0;">Security</h1>
         <p>ADAMZ applies practical controls to protect your data workflows and account operations.</p>
-        <h3>Controls</h3>
+
+        <h3>Platform safeguards</h3>
         <ul>
-          <li>HTTPS transport for data in transit.</li>
-          <li>Access controls and separation of payment flow and analytics flow.</li>
-          <li>Regular dependency updates and vulnerability patching.</li>
+          <li>HTTPS/TLS transport for data in transit between browser, API, and storage providers.</li>
+          <li>Server-side payment confirmation with Stripe session validation before upload unlock.</li>
+          <li>Runtime configuration via environment variables to avoid exposing secret keys in frontend code.</li>
+          <li>Dependency updates and security patching as part of release maintenance.</li>
         </ul>
-        <h3>Recommendations</h3>
+
+        <h3>Operational controls</h3>
         <ul>
-          <li>Mask sensitive identifiers before upload where possible.</li>
-          <li>Use internal governance checks for regulated datasets.</li>
+          <li>Transaction history records with timestamps to support traceability and incident review.</li>
+          <li>Access-protected history page credentials managed at API level.</li>
+          <li>Storage upload signing flow to avoid direct long-term credential exposure in the browser.</li>
         </ul>
+
+        <h3>Customer security best practices</h3>
+        <ul>
+          <li>Use strong, unique passwords for deployment and admin endpoints.</li>
+          <li>Set strict `ALLOWED_ORIGINS` in production and avoid wildcard CORS policies.</li>
+          <li>Rotate service keys periodically and immediately after team or environment changes.</li>
+          <li>Limit uploaded datasets to minimum-required fields for analytics.</li>
+        </ul>
+
+        <h3>Incident reporting</h3>
+        <p>If you identify a security concern, contact support with reproduction steps, impacted URL, and timestamp so we can prioritize triage.</p>
       </section>
     </main>
 

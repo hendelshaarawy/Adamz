@@ -31,7 +31,7 @@
           <div class="field checkbox-field">
             <label class="small"><input type="checkbox" id="agreePay" /> I agree to pay $5 for this upload.</label>
           </div>
-          <button id="payBtn" class="btn" type="submit">Pay $5 with Stripe</button>
+          <button id="payBtn" class="btn" type="submit">Pay $5</button>
           <span id="paymentStatus" class="small status-warn">Payment required before analysis.</span>
         </form>
 
@@ -82,6 +82,14 @@
             <h3>Outlier Radar (z-score style)</h3>
             <canvas id="outlierChart"></canvas>
           </article>
+          <article class="chart-card">
+            <h3>Column Quality Mix</h3>
+            <canvas id="qualityMixChart"></canvas>
+          </article>
+          <article class="chart-card">
+            <h3>Volatility by Numeric Column</h3>
+            <canvas id="volatilityChart"></canvas>
+          </article>
         </div>
 
         <h3>Missing values by column</h3>
@@ -92,6 +100,9 @@
 
         <h3>Top text categories</h3>
         <table id="categoryTable"><thead><tr><th>Column</th><th>Top values</th></tr></thead><tbody></tbody></table>
+
+        <h3>Top numeric correlations</h3>
+        <table id="correlationTable"><thead><tr><th>Column pair</th><th>Correlation</th><th>Strength</th></tr></thead><tbody></tbody></table>
 
         <article class="conclusion-card">
           <h3>Final Conclusion</h3>

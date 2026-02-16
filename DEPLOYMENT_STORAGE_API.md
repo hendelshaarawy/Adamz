@@ -245,7 +245,7 @@ In `upload.html` you can set:
 </script>
 ```
 
-Or, in `history.html`, paste your Storage API URL and click **Save Storage API URL** (stored in browser localStorage).
+The current app expects this to be configured once in `app-config.js` (hidden from visitors), not through visible page inputs.
 
 The frontend flow already implemented in `upload.js`:
 
@@ -345,7 +345,7 @@ If the Upload page shows `Failed to fetch`, the browser could not reach the Stor
 
 Check these items in order:
 
-1. Confirm Storage API URL is set correctly in `history.html` (or `window.ADAMZ_STORAGE_API`).
+1. Confirm Storage API URL is set correctly in `app-config.js` via `window.ADAMZ_STORAGE_API`.
 2. Open `<STORAGE_API_URL>/healthz` in browser. It should return JSON like `{"ok":true,...}`.
 3. Ensure backend server is running (`node server.js`) and accessible from your frontend origin.
 4. Set `ALLOWED_ORIGINS` on backend to include your frontend URL (for example `http://localhost:4173`).
@@ -464,6 +464,75 @@ If issue persists for a long time, contact Supabase support and include:
 - screenshot/error text
 
 ---
+
+## Troubleshooting: Render domain is verified but browser shows SSL/certificate error
+
+If Render shows your custom domain as **Verified** but browser opens:
+
+- `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`
+- `This site can’t provide a secure connection`
+- `uses an unsupported protocol`
+
+follow this exact checklist:
+
+1. Verify DNS records in GoDaddy exactly match Render custom domain instructions.
+   - For apex (`@`), use only the A records Render gives you.
+   - For `www`, use only the CNAME target Render gives you.
+2. Remove conflicting records for the same hostnames (`@`/`www`).
+   - Remove stale A/AAAA records not provided by Render.
+   - Remove any old CNAME for `www` that points to another platform.
+3. Check CAA records.
+   - If you use restrictive CAA, allow Let's Encrypt (`letsencrypt.org`) or remove restrictive CAA temporarily.
+4. Ensure SSL mode is not forced to incompatible settings by any DNS proxy/CDN layer.
+   - If using Cloudflare proxy, use Full/Strict correctly and avoid legacy TLS-only modes.
+5. In Render, open your service **Custom Domains** and trigger certificate re-issue/retry.
+6. Wait for propagation (can take up to 24 hours), then retest in an incognito window.
+
+Quick command-line verification:
+
+```bash
+curl -Iv https://adamz-ai.com
+openssl s_client -connect adamz-ai.com:443 -servername adamz-ai.com
+```
+
+If TLS still fails after DNS cleanup and certificate retry, remove and re-add the domain in Render Custom Domains, then reapply the exact DNS records Render provides.
+
+---
+
+### Fast path for your exact domain (`adamz-ai.com` on GoDaddy + Render)
+
+If you already see **Verified** in Render but browser still shows TLS mismatch, do this exact sequence:
+
+1. In Render (**Static Site** service that serves `adamz-ai.com`), open **Settings → Custom Domains** and copy the exact DNS values Render currently shows.
+2. In GoDaddy DNS for `adamz-ai.com`:
+   - Keep only Render-provided records for `@` and `www`.
+   - Delete any old `@` A/AAAA records from other hosts.
+   - Delete any `www` CNAME not pointing to Render.
+3. If a `CAA` record exists, temporarily remove it (or add `letsencrypt.org`), then save.
+4. Back in Render custom domains:
+   - remove `adamz-ai.com`,
+   - wait 60 seconds,
+   - add `adamz-ai.com` again,
+   - reapply the new DNS values shown by Render.
+5. Wait 10–30 minutes, then test from a fresh browser session.
+
+Windows checks (PowerShell/CMD):
+
+```bat
+nslookup adamz-ai.com
+nslookup -type=AAAA adamz-ai.com
+```
+
+If `AAAA` returns an address you did not set for Render, remove that AAAA record in GoDaddy.
+
+TLS check:
+
+```bash
+curl -Iv https://adamz-ai.com
+```
+
+Expected result includes a valid certificate chain and no handshake/protocol error.
+
 
 ## Security notes
 

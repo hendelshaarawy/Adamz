@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="48" x2="460" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(168 140) rotate(38) scale(210)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="248" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="248" fill="url(#glow)"/>
+  <circle cx="256" cy="256" r="236" stroke="#DBEAFE" stroke-opacity="0.9" stroke-width="6"/>
+
+  <g>
+    <text x="256" y="250" text-anchor="middle" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="124" font-weight="800" letter-spacing="3">
+      AD
+    </text>
+    <text x="256" y="304" text-anchor="middle" fill="#E0F2FE" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="600" letter-spacing="1.8">
+      ADAMZ
+    </text>
+  </g>
+</svg>
